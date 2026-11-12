@@ -1,5 +1,7 @@
 # Star Trek Lab: Red-Matter Probe Through Vulcan
 
+**Dylan Duan, Grade 11 Physics**
+
 An interactive physics simulation for a school project. A red-matter probe is
 dropped from rest 2.00 × 10⁶ m above a hole drilled to the centre of Vulcan.
 How long does it take to reach the centre, and how many Vulcans per second does

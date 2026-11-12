@@ -64,8 +64,8 @@ function WordToggle({ label, onToggle, children }: { label: string; onToggle: ()
 /** Red-pen marking of the reader's guess against the simulated time. */
 function markGuess(guess: number, actual: number): string {
   const pct = (100 * (guess - actual)) / actual;
-  if (Math.abs(pct) < 5) return "✓ within 5 %. Nice.";
-  return `✗ ${sf3(Math.abs(pct))} % too ${pct > 0 ? "long" : "short"}`;
+  if (Math.abs(pct) < 5) return "✓ close!";
+  return `✗ off by ${sf3(Math.abs(pct))} % (too ${pct > 0 ? "long" : "short"})`;
 }
 
 export default function Lab() {
@@ -186,13 +186,13 @@ export default function Lab() {
   const velocityNote = params.drag
     ? undefined
     : params.interior === "uniform"
-      ? "Fastest right at the centre: g has dropped to zero there, so nothing is left to speed it up."
-      : "Still speeding up at the centre, because g stays 13.73 m/s² all the way down.";
+      ? "Top speed is right at the centre, since g is 0 there and it stops speeding up."
+      : "Still speeding up at the centre, since g stays at 13.73 m/s² the whole way.";
   const accelNote = params.drag
     ? undefined
     : params.interior === "uniform"
-      ? "Peaks at the surface, then falls to zero at the centre."
-      : "Flat at 13.73 m/s² once it's inside.";
+      ? "Biggest at the surface, then goes down to 0 at the centre."
+      : "Stays at 13.73 m/s² once it's inside.";
 
   return (
     <main className="notebook">
@@ -201,9 +201,14 @@ export default function Lab() {
           <span className="tb-key">project</span>
           <span className="tb-val">Star Trek Lab</span>
         </div>
+        <div className="tb-cell tb-name">
+          <span className="tb-key">name</span>
+          <span className="tb-val">Dylan Duan</span>
+          <span className="tb-sub">Grade 11 Physics</span>
+        </div>
         <div className="tb-cell tb-problem">
           <span className="tb-key">problem</span>
-          <span className="tb-val">Red-matter probe dropped down a shaft to the centre of Vulcan</span>
+          <span className="tb-val">Dropping a red-matter probe down a hole to the centre of Vulcan</span>
         </div>
         <div className="tb-cell">
           <span className="tb-key">given</span>
@@ -216,28 +221,28 @@ export default function Lab() {
       <section className="entry">
         <h2>Aim</h2>
         <p className="reactive">
-          Find how long the probe takes to fall from{" "}
+          How long does the probe take to fall from{" "}
           <Scrub value={heightKm} min={0} max={10000} step={50} format={(v) => `${sf3(v)} km`}
             label="Drop height" onChange={setHeightKm} />{" "}
           above the surface,{" "}
           <Scrub value={launchSpeed} min={0} max={10000} step={50}
             format={(v) => (v === 0 ? "starting from rest" : `launched at ${sf3(v)} m/s`)}
             label="Launch speed toward the centre" onChange={setLaunchSpeed} />
-          , down to the centre of a Vulcan that is{" "}
+          , to the centre of Vulcan, if Vulcan is{" "}
           <WordToggle label="Switch interior model"
             onToggle={() => setInterior(interior === "uniform" ? "dense-core" : "uniform")}>
-            {interior === "uniform" ? "the same density all the way through" : "mostly a dense core"}
+            {interior === "uniform" ? "the same density all the way through" : "mostly one dense core"}
           </WordToggle>
-          ,{" "}
+          {" "}and{" "}
           <WordToggle label="Toggle air drag" onToggle={() => setDrag(!drag)}>
-            {drag ? "with air drag" : "ignoring air"}
+            {drag ? "air drag counts" : "we ignore air"}
           </WordToggle>
-          . Then work out how many Vulcans per second that is.
+          ? And how many Vulcans per second is that?
         </p>
-        <p className="hint">Drag the underlined numbers, click the underlined words.</p>
+        <p className="hint">(you can drag the dotted numbers and click the wavy words to change them)</p>
 
         <div className="guess">
-          <label htmlFor="guess">My guess first:</label>
+          <label htmlFor="guess">My guess:</label>
           <input id="guess" type="number" inputMode="decimal" min={0} placeholder="?" value={guess}
             onChange={(e) => setGuess(e.target.value)} />
           <span>s</span>
@@ -248,7 +253,7 @@ export default function Lab() {
           <span className="hl">t = {sf3(sim.totalTime)} s</span>
           <span className="so">so</span>
           <span className="hl hl-2">{sf3(sim.rate)} Vulcans/s</span>
-          {checked && <span className="redpen" title="Euler matches the exact formula to 3 s.f.">✓ matches exact</span>}
+          {checked && <span className="redpen" title="Euler and the formula agree to 3 s.f.">✓ same as the formula</span>}
         </p>
       </section>
 
@@ -258,7 +263,7 @@ export default function Lab() {
           <CrossSection samples={sim.samples} r0={sim.r0} interior={params.interior} />
 
           <fieldset className="vars">
-            <legend className="hand-label">Things I can change</legend>
+            <legend className="hand-label">What I can change</legend>
             <label className="field">
               <span className="field-row"><span>Drop height</span><output>{sf3(heightKm)} km</output></span>
               <input type="range" min={0} max={10000} step={10} value={heightKm}
@@ -289,7 +294,7 @@ export default function Lab() {
             <div className="vars-foot">
               <button className="btn" disabled={isTextbook}
                 onClick={() => { setHeightKm(DEFAULT_DROP_HEIGHT / 1000); setLaunchSpeed(0); setInterior("uniform"); setDrag(false); }}>
-                Back to the textbook problem
+                Back to the original question
               </button>
               <span className="status" aria-live="polite">{stale ? "working it out…" : ""}</span>
             </div>
@@ -320,25 +325,25 @@ export default function Lab() {
           </table>
         </div>
         <ul className="footnotes">
-          {params.drag && <li>* The exact formulas ignore drag, so here the difference shows how much drag matters.</li>}
-          {!sim.reachedCentre && <li>The simulation hit its time limit before reaching the centre.</li>}
-          {exact.t1 === null && <li>Launch speed is above escape speed, so the exact t₁ formula (which assumes a bound fall) doesn&apos;t apply.</li>}
-          <li>Euler steps of {DT} s. Everything rounded to 3 significant figures.</li>
+          {params.drag && <li>* the formulas don&apos;t include drag, so this column is basically how much drag changes things</li>}
+          {!sim.reachedCentre && <li>the sim hit its time limit before getting to the centre</li>}
+          {exact.t1 === null && <li>the launch speed is above escape speed, so the t₁ formula doesn&apos;t work here</li>}
+          <li>dt = {DT} s, all answers to 3 s.f.</li>
         </ul>
       </section>
 
       <section className="entry">
         <h2>Graphs</h2>
         <p className="aside">
-          Velocity and acceleration count as positive toward the centre. Pencil shading is time spent
-          inside the rock. Hover a graph to see where the probe was at that moment; click to send it there.
+          Toward the centre is positive. The shaded part is when it&apos;s inside the planet. Hover over a
+          graph to see where the probe was at that time, or click to move it there.
         </p>
         <Chart
           title="velocity vs time"
           xKey="t" yKey="v" xLabel="Time (s)" yLabel="Velocity (m/s)"
           series={[
             { name: "This run", data: plotData, color: modelColor },
-            ...(ghost ? [{ name: "Previous settings", data: ghost.data, color: p.pencil, dashed: true }] : []),
+            ...(ghost ? [{ name: "last try", data: ghost.data, color: p.pencil, dashed: true }] : []),
           ]}
           marker={surfaceMarker} rock={shaft} height={290} tilt={-0.4}
           timeAxis xDomain={[0, Math.max(sim.totalTime, ghost?.end ?? 0)]}
@@ -369,7 +374,7 @@ export default function Lab() {
             rock={{ x1: 0, x2: R / 1000, label: "inside Vulcan" }} tilt={0.3}
             xDomain={[0, Math.max(sim.r0, 2 * R) / 1000]}
             followX={(t) => sampleAt(sim.samples, t).r / 1000}
-            note="Outside, both models are the same GM/r² curve. They only split once you're underground."
+            note="Outside the planet both models give the same GM/r² curve. They only split up inside."
           />
           <Chart
             title="rate vs drop height"
@@ -383,10 +388,10 @@ export default function Lab() {
       </section>
 
       <section className="entry">
-        <h2>Does the model of Vulcan matter?</h2>
+        <h2>Uniform vs dense core</h2>
         <p className="aside">
-          Same drop, both interiors. Drag gets its own graph: it slows the fall so much that, on one
-          time axis, the drag-free lines would be squashed against the left edge.
+          Same drop, both models. Drag is on its own graph because it makes the fall take way longer,
+          and the other lines got squished when they were together.
         </p>
         <div className="pair">
           <Chart
@@ -412,7 +417,7 @@ export default function Lab() {
           <dt>exact, inside</dt><dd>uniform: t₂ = tan⁻¹(ωR/v<sub>s</sub>)/ω, ω = √(g₀/R)<br />dense core: t₂ = (−v<sub>s</sub> + √(v<sub>s</sub>² + 2g₀R))/g₀</dd>
           <dt>rate</dt><dd>population ÷ total fall time</dd>
         </dl>
-        <p className="foot">The physics code is in <code>src/lib/physics.ts</code>.</p>
+        <p className="foot">All the physics code is in <code>src/lib/physics.ts</code>.</p>
       </section>
     </main>
   );

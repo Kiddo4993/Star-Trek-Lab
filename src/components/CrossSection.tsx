@@ -264,11 +264,11 @@ export default function CrossSection({
         onChange={(e) => { setPlaying(false); timeline.set({ time: Number(e.target.value) }); }}
         aria-label="Scrub through the fall"
       />
-      <p className="keys">Space bar drops it. Arrow keys step through the fall.</p>
+      <p className="keys">(space bar = drop, arrow keys = step through it)</p>
       <dl className={`readout${ghost ? " is-ghost" : ""}`}>
-        <div><dt>{ghost ? "Time (hovered)" : "Time"}</dt><dd>{sf3(shown.t)} s</dd></div>
+        <div><dt>{ghost ? "Time (hovering)" : "Time"}</dt><dd>{sf3(shown.t)} s</dd></div>
         <div><dt>Height</dt><dd>{sf3((shown.r - R) / 1000)} km</dd></div>
-        <div><dt>Speed in</dt><dd>{sf3(shown.v)} m/s</dd></div>
+        <div><dt>Speed</dt><dd>{sf3(shown.v)} m/s</dd></div>
         <div><dt>Acceleration</dt><dd>{sf3(shown.a)} m/s²</dd></div>
       </dl>
       <p className="where">The probe is {whereOf(shown.r)}.</p>

@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Star Trek Lab",
-  description: "How long does a red-matter probe take to fall through Vulcan? Euler's method against the exact answer.",
+  description: "Dylan Duan, Grade 11 Physics. How long a red-matter probe takes to fall to the centre of Vulcan, using Euler's method and checking it with the formulas.",
 };
 
 export const viewport: Viewport = { themeColor: "#EEF3E4" };

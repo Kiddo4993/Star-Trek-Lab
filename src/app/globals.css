@@ -66,7 +66,7 @@ body {
 /* ---------- title block (top strip of an engineering pad) ---------- */
 .titleblock {
   display: grid;
-  grid-template-columns: 1fr 2fr 1.5fr;
+  grid-template-columns: 1.1fr 1fr 2fr 1.5fr;
   border: 2px solid var(--pencil);
   background: var(--pad);
 }
@@ -86,6 +86,7 @@ body {
 .tb-val { font-size: 22px; line-height: 1.25; }
 .tb-project .tb-val { font-weight: 700; font-size: 26px; }
 .tb-val.small { font-size: 17px; }
+.tb-sub { font-size: 16px; color: var(--pencil); line-height: 1.2; }
 
 /* ---------- entries ---------- */
 .entry { margin-top: 44px; }
