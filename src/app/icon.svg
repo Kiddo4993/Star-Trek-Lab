@@ -1,1 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="18" r="13" fill="#d6b48a" stroke="#8a6a44" stroke-width="1.5"/><rect x="14.5" y="5" width="3" height="13" fill="#333"/><circle cx="16" cy="3.5" r="3" fill="#c00"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Star Trek Lab: the velocity-vs-time curve on engineering paper.
+       Pencil axes, blue-ink curve, red-pen dot where the probe reaches the centre.
+       2-unit strokes on odd coordinates land on pixel centres at 16/32 px. -->
+  <rect x="0.5" y="0.5" width="31" height="31" rx="7" fill="#EEF3E4" stroke="#AFC69C"/>
+  <path d="M1 11h30M1 18h30M14 1v30M21 1v30" stroke="#D3E1C6" stroke-width="1"/>
+  <path d="M7 4.5V25h20.5" fill="none" stroke="#55585F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8 24.2C13 23.5 16.6 19.5 19.2 14.6 21.2 10.8 23 8.6 25.4 7.8" fill="none" stroke="#1F3A8F" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="25.4" cy="7.8" r="3.4" fill="#C3302A"/>
+</svg>
