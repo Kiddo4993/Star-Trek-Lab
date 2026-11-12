@@ -1,0 +1,551 @@
+/*
+ * Star Trek Lab: a student's lab write-up on engineering paper.
+ * Handwriting (Kalam) is the student's pen; graphs and the cross-section
+ * are white printouts taped in. Light only: it's paper.
+ */
+:root {
+  color-scheme: light;
+
+  /* the notebook */
+  --pad: #eef3e4; /* engineering paper */
+  --grid-minor: #d6e3ca;
+  --grid-major: #b9cfa9;
+
+  /* pens */
+  --ink: #1f3a8f; /* blue ballpoint */
+  --pencil: #55585f; /* graphite */
+  --red: #c3302a; /* red pen: probe + surface only */
+  --highlight: #f5e463; /* the one bold accent: answers */
+  --tape: rgba(226, 216, 170, 0.7);
+
+  /* printouts and the cross-section drawing */
+  --paper: #ffffff;
+  --print: #2b2b2b;
+  --muted: #55585f;
+  --rock: #ecebe6; /* pencil-shaded rock */
+  --rock-deep: #6b6e75; /* hatching */
+  --air: #dde7f3;
+  --core: #8c8f96;
+  --shaft: #1f3a8f;
+
+  /* motion: steep ease-out, short for UI, one longer signature swipe */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-reveal: cubic-bezier(0.19, 1, 0.22, 1);
+
+  --hand: var(--font-hand), "Comic Neue", "Segoe Print", cursive;
+  --printer: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--hand);
+  font-size: 19px;
+  line-height: 1.5;
+  background-color: var(--pad);
+  /* 5 mm squares, heavier line every fifth (engineering pad) */
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: -1px -1px;
+}
+
+.notebook {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+/* ---------- title block (top strip of an engineering pad) ---------- */
+.titleblock {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1.5fr;
+  border: 2px solid var(--pencil);
+  background: var(--pad);
+}
+.tb-cell {
+  padding: 6px 12px 8px;
+  border-left: 1px solid var(--pencil);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tb-cell:first-child { border-left: 0; }
+.tb-key {
+  font-family: var(--printer);
+  font-size: 11px;
+  color: var(--pencil);
+}
+.tb-val { font-size: 22px; line-height: 1.25; }
+.tb-project .tb-val { font-weight: 700; font-size: 26px; }
+.tb-val.small { font-size: 17px; }
+
+/* ---------- entries ---------- */
+.entry { margin-top: 44px; }
+.entry > h2 {
+  display: inline-block;
+  margin: 0 0 10px;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 7px;
+}
+.entry p { max-width: 64ch; margin: 0 0 10px; }
+.aside { color: var(--pencil); font-size: 17px; }
+
+/* the answer, highlighted like a student would */
+.answer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  font-size: 30px;
+  font-weight: 700;
+  margin-top: 6px !important;
+}
+.answer .so { font-weight: 300; font-size: 22px; color: var(--pencil); }
+.hl {
+  padding: 0 6px;
+  margin: 0 -2px;
+  background: linear-gradient(100deg, transparent 0.6%, var(--highlight) 2%, var(--highlight) 96%, transparent 98%);
+  background-size: 100% 70%;
+  background-position: 0 70%;
+  background-repeat: no-repeat;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+/* The signature moment: the highlighter swipes across, left to right, when
+   a new answer settles. Re-runs because the element is re-keyed. */
+.answer .hl { animation: swipe 650ms var(--ease-reveal) both; }
+.answer .hl-2 { animation-delay: 140ms; }
+@keyframes swipe {
+  from { background-size: 0% 70%; }
+  to { background-size: 100% 70%; }
+}
+.redpen {
+  color: var(--red);
+  font-size: 20px;
+  font-weight: 400;
+  transform: rotate(-4deg);
+  display: inline-block;
+}
+
+/* ---------- the reactive Aim sentence ---------- */
+.reactive { font-size: 21px; line-height: 1.7; max-width: 60ch !important; }
+.scrub-num {
+  color: var(--ink);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: ew-resize;
+  touch-action: pan-y; /* horizontal drags scrub, vertical still scrolls */
+  user-select: none;
+  -webkit-user-select: none;
+  border-bottom: 2px dotted var(--ink);
+  padding: 0 2px;
+  border-radius: 3px;
+  transition: background-color 120ms var(--ease-out);
+}
+.scrub-num:hover,
+.is-scrubbing .scrub-num:focus { background: rgba(31, 58, 143, 0.09); }
+body.is-scrubbing, body.is-scrubbing * { cursor: ew-resize !important; }
+.word-toggle {
+  display: inline; /* wrap mid-phrase like ordinary text */
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: wavy;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 5px;
+  text-decoration-color: rgba(31, 58, 143, 0.55);
+  transition: text-decoration-color 120ms var(--ease-out), background-color 120ms var(--ease-out);
+}
+.word-toggle:hover { text-decoration-color: var(--ink); background: rgba(31, 58, 143, 0.06); }
+.hint { color: var(--pencil); font-size: 16px; margin-top: -4px !important; }
+
+.guess {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 18px 0 4px;
+}
+.guess label { color: var(--pencil); }
+.guess input {
+  font: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  width: 5.5em;
+  padding: 0 4px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  border-radius: 0;
+  -moz-appearance: textfield;
+}
+.guess input::-webkit-outer-spin-button,
+.guess input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.guess input::placeholder { color: var(--pencil); opacity: 0.6; }
+/* Red pen marks are "written" left to right, like ink going down. The
+   answer's tick waits for the highlighter swipe to finish first. */
+.mark { animation: write 380ms var(--ease-out) both; }
+.answer .redpen { animation: write 420ms var(--ease-out) 620ms both; }
+@keyframes write {
+  from { clip-path: inset(-20% 100% -20% 0); }
+  to { clip-path: inset(-20% 0 -20% 0); }
+}
+
+/* Red-matter collapse at the centre: rings accelerate inward (ease-in on
+   purpose: this one is something falling, not UI arriving). */
+.collapse circle {
+  fill: none;
+  stroke: var(--red);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: implode 900ms cubic-bezier(0.55, 0, 1, 0.45) both;
+}
+.collapse .singularity {
+  fill: #3a0c10;
+  stroke: var(--red);
+  animation: singularity 420ms var(--ease-out) 900ms both;
+}
+@keyframes implode {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(0); opacity: 0.2; }
+}
+@keyframes singularity {
+  from { transform: scale(0); }
+  60% { transform: scale(1.35); }
+  to { transform: scale(1); }
+}
+
+/* ---------- taped-in printouts ---------- */
+.taped {
+  position: relative;
+  transform: rotate(var(--tilt, 0deg));
+  transition: opacity 260ms var(--ease-out), transform 520ms var(--ease-reveal);
+  background: var(--paper);
+  border: 1px solid #d9d9d4;
+  box-shadow: 1px 2px 0 rgba(60, 70, 50, 0.12);
+  padding: 10px 8px 4px;
+}
+/* Not yet scrolled to: lifted slightly off the page, waiting to be taped down. */
+.taped.is-waiting {
+  opacity: 0;
+  transform: translateY(-10px) rotate(calc(var(--tilt, 0deg) - 1.4deg));
+}
+/* The cross-section is above the fold, so it settles on page load instead. */
+.taped.is-settling { animation: settle 560ms var(--ease-reveal) 80ms both; }
+@keyframes settle {
+  from { opacity: 0; transform: translateY(-10px) rotate(calc(var(--tilt, 0deg) - 1.4deg)); }
+  to { opacity: 1; transform: rotate(var(--tilt, 0deg)); }
+}
+
+.taped::before,
+.taped::after {
+  content: "";
+  position: absolute;
+  top: -11px;
+  width: 74px;
+  height: 22px;
+  background: var(--tape);
+  border-left: 1px dashed rgba(150, 140, 100, 0.35);
+  border-right: 1px dashed rgba(150, 140, 100, 0.35);
+  pointer-events: none;
+}
+.taped::before { left: 18px; transform: rotate(-5deg); }
+.taped::after { right: 22px; transform: rotate(4deg); }
+
+.hand-label {
+  font-family: var(--hand);
+  font-size: 21px;
+  color: var(--ink);
+  margin: 0 0 14px 4px;
+  padding: 0;
+}
+.margin-note {
+  color: var(--pencil);
+  font-size: 17px;
+  line-height: 1.35;
+  margin: 10px 0 0 12px !important;
+  padding-left: 14px;
+  border-left: 2px solid var(--pencil);
+  max-width: 52ch;
+}
+
+.chart { margin: 26px 0 0; min-width: 0; }
+.print-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 0 8px 4px;
+  font-family: var(--printer);
+  font-size: 12px;
+  color: var(--print);
+}
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.print-caption { color: #666; }
+
+/* linked overlay: the probe's moment on each graph */
+.plot { position: relative; }
+.plot.is-linked { cursor: crosshair; }
+.overlay { position: absolute; pointer-events: none; overflow: hidden; }
+.track { position: absolute; inset: 0; }
+.now-line,
+.hover-line,
+.cover {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 120ms var(--ease-out);
+  will-change: transform;
+}
+.now-line { border-left: 2px solid var(--red); }
+.hover-line { border-left: 1.5px dashed var(--pencil); }
+/* the part of the graph the probe hasn't reached yet, faded out */
+.cover { background: rgba(255, 255, 255, 0.78); border-left: 0; }
+
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 32px;
+}
+
+/* ---------- set-up: cross-section + variables ---------- */
+.setup-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 36px;
+  align-items: start;
+  margin-top: 18px;
+}
+.cross svg { display: block; width: 100%; height: auto; }
+.svg-label { font-family: var(--hand); font-size: 17px; fill: var(--pencil); }
+.svg-tick { font-family: var(--printer); font-size: 12px; fill: var(--print); }
+.svg-tick.strong { font-weight: 700; }
+
+.transport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-top: 18px;
+}
+.speed { display: inline-flex; align-items: baseline; gap: 8px; color: var(--pencil); }
+.scrub { margin-top: 10px; }
+.readout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px 14px;
+  margin: 12px 0 0;
+}
+.readout div { min-width: 0; }
+.readout dt { font-size: 15px; color: var(--pencil); }
+.readout dd { margin: 0; font-size: 19px; font-weight: 700; white-space: nowrap; }
+.where { color: var(--pencil); margin-top: 6px !important; }
+.readout dd { transition: color 120ms var(--ease-out); }
+.readout.is-ghost dd { color: var(--pencil); }
+.keys { color: var(--pencil); font-size: 15px; margin: 4px 0 0 !important; }
+.ghost-probe circle { fill: none; stroke: var(--pencil); stroke-width: 2; stroke-dasharray: 3 3; }
+
+.vars {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.vars legend { float: left; width: 100%; }
+.field { display: block; margin: 0 0 20px; clear: both; }
+.field-row { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.field-row output { font-weight: 700; white-space: nowrap; }
+.toggle { display: flex; gap: 12px; align-items: flex-start; margin: 4px 0 20px; cursor: pointer; }
+.toggle small { display: block; color: var(--pencil); font-size: 15px; line-height: 1.35; }
+.vars-foot { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.status { color: var(--pencil); font-size: 16px; }
+
+/* ---------- form controls, drawn in pen ---------- */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 26px;
+  background: transparent;
+  margin: 2px 0 0;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px;
+  background: var(--ink);
+}
+input[type="range"]::-moz-range-track { height: 2px; background: var(--ink); }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -8px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 2.5px solid var(--ink);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 2.5px solid var(--ink);
+}
+
+select {
+  font: inherit;
+  font-size: 18px;
+  color: var(--ink);
+  width: 100%;
+  margin-top: 4px;
+  padding: 4px 26px 4px 2px;
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  border-radius: 0;
+  background: transparent
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231f3a8f' stroke-width='2'/%3E%3C/svg%3E")
+    no-repeat right 6px center;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+.speed select { width: auto; margin: 0; }
+
+input[type="checkbox"] {
+  accent-color: var(--ink);
+  width: 20px;
+  height: 20px;
+  margin: 5px 0 0;
+  flex: none;
+}
+
+/* buttons: a box drawn by hand around the words */
+.btn {
+  font: inherit;
+  font-size: 19px;
+  color: var(--ink);
+  background: transparent;
+  padding: 4px 16px 3px;
+  border: 2px solid var(--ink);
+  border-radius: 255px 14px 225px 14px / 14px 225px 14px 255px;
+  cursor: pointer;
+  transition: background-color 120ms var(--ease-out), color 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:hover:not(:disabled) { background: rgba(31, 58, 143, 0.07); }
+.btn.primary { border-width: 3px; font-weight: 700; }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.btn:disabled { color: var(--pencil); border-color: var(--pencil); opacity: 0.55; cursor: default; }
+
+:focus-visible { outline: 2px dashed var(--red); outline-offset: 3px; }
+
+/* ---------- results: a table ruled by hand ---------- */
+.table-wrap { overflow-x: auto; margin-top: 10px; max-width: 820px; }
+.ruled {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: 19px;
+}
+.ruled th,
+.ruled td {
+  text-align: left;
+  padding: 6px 14px 4px;
+  border-bottom: 1.5px solid var(--pencil);
+  white-space: nowrap;
+}
+.ruled thead th { border-bottom: 2.5px solid var(--ink); font-weight: 700; }
+.ruled tbody th { font-weight: 400; color: var(--pencil); padding-left: 0; }
+.ruled td + td,
+.ruled th + td { border-left: 1.5px solid var(--pencil); }
+.ruled tr.key td { font-weight: 700; }
+.footnotes {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  color: var(--pencil);
+  font-size: 16px;
+}
+
+/* ---------- working ---------- */
+.working dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 22px;
+  margin: 8px 0 0;
+}
+.working dt { color: var(--pencil); }
+.working dd { margin: 0; }
+.foot { color: var(--pencil); font-size: 16px; margin-top: 26px !important; }
+code { font-family: ui-monospace, Menlo, monospace; font-size: 0.82em; color: var(--print); }
+
+@media (prefers-reduced-motion: reduce) {
+  .answer .hl, .mark, .answer .redpen, .taped.is-settling { animation: none; }
+  .taped { transition: none; }
+  .collapse circle { animation: none; opacity: 0; }
+  .collapse .singularity { animation: none; opacity: 1; }
+  .btn:active:not(:disabled) { transform: none; }
+}
+@media (hover: none) {
+  .keys { display: none; } /* no keyboard on most touch devices */
+}
+
+/* ---------- small screens ---------- */
+@media (max-width: 860px) {
+  .setup-grid,
+  /* linked overlay: the probe's moment on each graph */
+.plot { position: relative; }
+.plot.is-linked { cursor: crosshair; }
+.overlay { position: absolute; pointer-events: none; overflow: hidden; }
+.track { position: absolute; inset: 0; }
+.now-line,
+.hover-line,
+.cover {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 120ms var(--ease-out);
+  will-change: transform;
+}
+.now-line { border-left: 2px solid var(--red); }
+.hover-line { border-left: 1.5px dashed var(--pencil); }
+/* the part of the graph the probe hasn't reached yet, faded out */
+.cover { background: rgba(255, 255, 255, 0.78); border-left: 0; }
+
+.pair { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  body { font-size: 18px; }
+  .notebook { padding: 18px 16px 48px; }
+  .titleblock { grid-template-columns: 1fr; }
+  .tb-cell { border-left: 0; border-top: 1px solid var(--pencil); }
+  .tb-cell:first-child { border-top: 0; }
+  .entry > h2 { font-size: 26px; }
+  .answer { font-size: 25px; }
+  .reactive { font-size: 19px; }
+  .readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ruled { font-size: 16px; }
+  .ruled th, .ruled td { padding: 5px 8px 3px; }
+  .working dl { grid-template-columns: 1fr; gap: 2px; }
+  .working dd { margin-bottom: 10px; }
+  .svg-tick { font-size: 15px; }
+  .svg-label { font-size: 20px; }
+}
