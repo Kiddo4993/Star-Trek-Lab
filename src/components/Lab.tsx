@@ -18,6 +18,7 @@ import { sf3 } from "@/lib/format";
 import { PALETTE as p } from "@/lib/theme";
 import CrossSection, { sampleAt } from "./CrossSection";
 import { Scrub } from "./Scrub";
+import Mark from "./Mark";
 import { Chart, type Series } from "./Charts";
 
 /** Percent difference between Euler and exact, or "—" if no exact value. */
@@ -198,22 +199,24 @@ export default function Lab() {
     <main className="notebook">
       <header className="titleblock">
         <div className="tb-cell tb-project">
-          <span className="tb-key">project</span>
-          <span className="tb-val">Star Trek Lab</span>
+          <span className="tb-key">Project</span>
+          <span className="tb-title"><Mark size={34} />Star Trek Lab</span>
         </div>
         <div className="tb-cell tb-name">
-          <span className="tb-key">name</span>
-          <span className="tb-val">Dylan Duan</span>
-          <span className="tb-sub">Grade 11 Physics</span>
+          <span className="tb-key">Name</span>
+          <span className="tb-val strong">Dylan Duan</span>
+          <span className="tb-sub">Grade <span className="digits">11</span> Physics</span>
         </div>
         <div className="tb-cell tb-problem">
-          <span className="tb-key">problem</span>
+          <span className="tb-key">Problem</span>
           <span className="tb-val">Dropping a red-matter probe down a hole to the centre of Vulcan</span>
         </div>
-        <div className="tb-cell">
-          <span className="tb-key">given</span>
-          <span className="tb-val small">
-            R = {sf3(R)} m, g₀ = {sf3(G0)} m/s², population {sf3(POPULATION)}
+        <div className="tb-cell tb-given">
+          <span className="tb-key">Given</span>
+          <span className="tb-list">
+            <span>R = {sf3(R)} m</span>
+            <span>g<sub>0</sub> = {sf3(G0)} m/s²</span>
+            <span>population {sf3(POPULATION)}</span>
           </span>
         </div>
       </header>
