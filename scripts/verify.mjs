@@ -1,14 +1,16 @@
-// Checks the Euler simulation against the exact formulas and the expected
-// answers (1.36e3 s, 5.15e6 Vulcans/s). Run with: npm run verify
-// Requires Node ≥ 22.18 (runs the .ts file directly via type stripping).
-import { simulate, exactSolution, DEFAULT_DROP_HEIGHT } from "../src/lib/physics.ts";
+// Checks that the Euler simulation gives the expected answers
+// (1.36e3 s and 5.15e6 Vulcans/s), and that a 10x bigger step gives the
+// same answer to 3 s.f. Run with: npm run verify
+// Needs Node 22.18 or newer (it runs the .ts file directly).
+import { simulate, DEFAULT_DROP_HEIGHT } from "../src/lib/physics.ts";
 
-const sim = simulate({ dropHeight: DEFAULT_DROP_HEIGHT, launchSpeed: 0, interior: "uniform", drag: false, recordEvery: 0 });
-const ex = exactSolution(DEFAULT_DROP_HEIGHT, 0, "uniform");
+const opts = { dropHeight: DEFAULT_DROP_HEIGHT, launchSpeed: 0, interior: "uniform", drag: false, recordEvery: 0 };
+const fine = simulate(opts); // dt = 0.01 s
+const coarse = simulate({ ...opts, dt: 0.1 });
 const s3 = (x) => Number(x).toPrecision(3);
 
-console.log(`Euler: t_surface = ${s3(sim.surfaceTime)} s, t_total = ${s3(sim.totalTime)} s, rate = ${s3(sim.rate)} Vulcans/s`);
-console.log(`Exact: t1 = ${s3(ex.t1)} s, t2 = ${s3(ex.t2)} s, total = ${s3(ex.total)} s, rate = ${s3(ex.rate)} Vulcans/s`);
+console.log(`dt = 0.01 s: t_surface = ${s3(fine.surfaceTime)} s, t_total = ${s3(fine.totalTime)} s, rate = ${s3(fine.rate)} Vulcans/s`);
+console.log(`dt = 0.1 s:  t_surface = ${s3(coarse.surfaceTime)} s, t_total = ${s3(coarse.totalTime)} s, rate = ${s3(coarse.rate)} Vulcans/s`);
 
 let ok = true;
 const check = (label, got, want) => {
@@ -16,8 +18,7 @@ const check = (label, got, want) => {
   ok &&= pass;
   console.log(`${pass ? "PASS" : "FAIL"} ${label}: ${s3(got)} (expected ${want})`);
 };
-check("Euler total time", sim.totalTime, "1.36e+3");
-check("Euler rate", sim.rate, "5.15e+6");
-check("Exact total time", ex.total, "1.36e+3");
-check("Exact rate", ex.rate, "5.15e+6");
+check("total time", fine.totalTime, "1.36e+3");
+check("rate", fine.rate, "5.15e+6");
+check("total time with dt = 0.1 s", coarse.totalTime, "1.36e+3");
 process.exit(ok ? 0 : 1);

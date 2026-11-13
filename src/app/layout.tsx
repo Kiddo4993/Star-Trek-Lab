@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Star Trek Lab",
-  description: "Dylan Duan, Grade 11 Physics. How long a red-matter probe takes to fall to the centre of Vulcan, using Euler's method and checking it with the formulas.",
+  description: "Dylan Duan, Grade 11 Physics. How long a red-matter probe takes to fall to the centre of Vulcan, worked out step by step with Euler's method.",
 };
 
 export const viewport: Viewport = { themeColor: "#EEF3E4" };

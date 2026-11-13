@@ -522,6 +522,11 @@ input[type="checkbox"] {
   font-size: 16px;
 }
 
+/* ---------- method ---------- */
+.euler-steps { max-width: 64ch; margin: 0 0 12px; padding-left: 1.6em; }
+.euler-steps li { margin-bottom: 4px; }
+.method .table-wrap { margin-bottom: 10px; }
+
 /* ---------- working ---------- */
 .working dl {
   display: grid;

@@ -2,306 +2,294 @@ STAR TREK LAB: HOW THE CODE WORKS
 =================================
 
 A red-matter probe is dropped 2.00e6 m above a hole drilled to the centre
-of Vulcan. The site works out how long it takes to reach the centre
-(1.36e3 s) and how many Vulcans per second that is (5.15e6), two ways:
-step by step with Euler's method, and with the exact formulas. Then it
-draws everything.
+of Vulcan. The site works out how long it takes to get to the centre
+(1.36e3 s) and how many Vulcans per second that is (5.15e6). It does this
+with Euler's method, then draws the graphs and the animation.
 
 
 1. WHERE EVERYTHING IS
 ----------------------
 
-  src/lib/physics.ts        ALL the physics. No React, no imports.
+  src/lib/physics.ts        All the physics. No React, no imports.
   src/lib/format.ts         Rounds numbers to 3 significant figures.
   src/lib/theme.ts          Pen colours for the graphs.
   src/lib/fonts.ts          The handwriting font (Kalam).
-  src/lib/timeline.ts       Shared "where are we in the fall?" store.
+  src/lib/timeline.ts       Keeps track of where we are in the fall.
 
-  src/app/page.tsx          The page. Just shows <Lab />.
+  src/app/page.tsx          The page. It just shows <Lab />.
   src/app/layout.tsx        The <html> wrapper: title, font.
   src/app/globals.css       All the styling (graph paper, tape, pens).
   src/app/icon.svg          The browser-tab icon.
 
   src/components/Lab.tsx           The whole page: inputs, results, graphs.
   src/components/CrossSection.tsx  The animated drawing of Vulcan.
-  src/components/Charts.tsx        One reusable graph ("taped-in printout").
-  src/components/Scrub.tsx         A number in a sentence you drag to change.
+  src/components/Charts.tsx        One graph component that all the graphs use.
+  src/components/Scrub.tsx         A number in a sentence you can drag.
 
   scripts/verify.mjs        Checks the answers are 1.36e3 s and 5.15e6.
   next.config.ts            Makes the site a plain static website.
   .github/workflows/deploy.yml   Publishes to GitHub Pages on every push.
 
-The important idea: physics.ts knows nothing about the website, and the
-website never does physics itself. It just calls physics.ts and draws the
-numbers. That's why the same file can be checked by verify.mjs with no
-browser at all.
+physics.ts doesn't know anything about the website, and the website
+doesn't do any physics itself. It calls physics.ts and draws what comes
+back. Because of that, verify.mjs can check the physics without a browser.
 
 
 2. THE PHYSICS (src/lib/physics.ts)
 -----------------------------------
 
-Sign convention, used everywhere:
+Signs (same everywhere):
   r = distance from Vulcan's centre (m)
   v = speed TOWARD the centre (m/s), positive while falling in
   a = acceleration TOWARD the centre (m/s^2)
 
-Because v points inward, r goes DOWN as the probe falls. That's why the
-position update is r -= v*dt rather than r += v*dt.
+v points inward, so r gets smaller as the probe falls. That's why the
+position update is r = r - v*dt and not r = r + v*dt.
 
 --- Constants ---
-  G0 = 13.73, R = 6.792e6, POPULATION = 7.00e9 come straight from the
-  question. GM is worked out from them: at the surface g0 = GM/R^2, so
-  GM = g0 * R^2. DT = 0.01 s is the Euler time step.
+  G0 = 13.73, R = 6.792e6 and POPULATION = 7.00e9 are from the question.
+  GM comes from those: at the surface g0 = GM/R^2, so GM = g0 * R^2.
+  DT = 0.01 s is the Euler time step.
 
-  The drag numbers (mass 2000 kg, Cd 0.47, air 1.2*e^(-h/8500)) are also
-  from the question. PROBE_RADIUS = 0.5 m is an ASSUMPTION: the question
+  The drag numbers (mass 2000 kg, Cd 0.47, air 1.2*e^(-h/8500)) are from
+  the question too. PROBE_RADIUS = 0.5 m is my guess, because the question
   gives the mass but not the size, and drag needs the area A = pi*r^2.
 
 --- gravity(r, interior) ---
-  Outside (r >= R):  g = GM / r^2            (Newton)
-  Inside, uniform:   g = G0 * r / R          (shell theorem: only mass
-                                              closer than r pulls, and
-                                              that grows like r^3)
-  Inside, dense core: g = G0                  (all the mass is at the
-                                              middle, so g stays 13.73)
+  Outside (r >= R):   g = GM / r^2        Newton's law of gravity
+  Inside, uniform:    g = G0 * r / R      only the mass closer to the
+                                          centre than r pulls on it, and
+                                          there's less of it the deeper
+                                          you go, so g drops to 0
+  Inside, dense core: g = G0              all the mass is in the middle,
+                                          so g stays at 13.73
 
 --- airDensity(h) ---
-  h is height above the surface (negative = in the shaft).
-  Above ground: 1.2 * e^(-h/8500).
-  Inside the shaft: THIS IS THE TODO FOR YOU. Carrying on with the same
-  formula underground gives e^(+799) at the centre, which is Infinity on
-  a computer. Right now it just returns sea-level air (1.2).
+  h is the height above the surface (negative means in the shaft).
+  Above ground it's 1.2 * e^(-h/8500).
+  Inside the shaft is still a TODO FOR YOU. If you keep using the same
+  formula underground you get e^(+799) at the centre, which is Infinity
+  on a computer. For now it just uses sea-level air (1.2).
 
 --- dragAccel(r, v) and netAccel(r, v, interior, drag) ---
-  Drag force F = 1/2 * rho * Cd * A * v^2. Divide by mass to get an
-  acceleration. Drag always fights the motion, so
-      net acceleration = gravity - sign(v) * drag.
-  With drag switched off it's just gravity.
+  Drag force F = 1/2 * rho * Cd * A * v^2. Dividing by the mass turns it
+  into an acceleration. Drag always pushes against the motion, so
+      net acceleration = gravity - sign(v) * drag
+  With drag off it's just gravity.
 
 --- simulate(options): EULER'S METHOD ---
+  The problem is that a keeps changing as the probe falls, so you can't
+  use the constant-acceleration equations for the whole trip. Euler's
+  method cuts the fall into tiny steps of dt = 0.01 s. In that short a
+  time a barely changes, so for one step you can pretend it's constant.
+
   Start: r = R + dropHeight, v = launchSpeed, step = 0.
   Loop while r > 0:
       a = netAccel(r, v)      1. acceleration from where it is now
-      v = v + a*dt            2. update the velocity
+      v = v + a*dt            2. new velocity
       r = r - v*dt            3. move, using the NEW velocity
       step = step + 1
-  Total time = step * dt. (Multiplying at the end, instead of adding 0.01
-  over and over, avoids tiny rounding errors piling up.)
+  Total time = step * dt. Doing the multiplication once at the end,
+  instead of adding 0.01 thousands of times, stops rounding errors from
+  building up.
 
-  Using the NEW v in step 3 makes this "semi-implicit Euler" (also called
-  Euler-Cromer). It's much more stable than plain Euler for the
-  spring-like motion inside the planet. That's why it agrees with the
-  exact answer to about 0.0003 %.
+  Step 3 uses the new v instead of the old one. That version is called
+  Euler-Cromer. Inside the planet the probe moves like a mass on a spring,
+  and plain Euler (using the old v) slowly adds energy that shouldn't be
+  there. Euler-Cromer doesn't have that problem.
 
-  While looping it also:
-    - notes the moment r first drops below R (the surface crossing) and
-      the speed at that moment;
-    - saves a "sample" {t, r, v, a, x} every 1 s of simulated time, which
-      the graphs and animation use (x = distance fallen = r0 - r);
-    - stops anyway after 200 000 s, so a bad setting can't freeze the page.
+  How do you know dt is small enough? Run it again with a bigger dt. If
+  the answer is the same, the step size isn't affecting it anymore. The
+  page does this with dt = 1, 0.1 and 0.01 s, and verify.mjs checks that
+  0.1 and 0.01 give the same answer to 3 s.f.
+
+  While it loops it also:
+    - saves the moment r first drops below R (crossing the surface) and
+      the speed then
+    - saves a "sample" {t, r, v, a, x} every 1 s of simulated time for the
+      graphs and animation (x = distance fallen = r0 - r)
+    - gives up after 200 000 s so a weird setting can't freeze the page
 
   It returns the samples plus totalTime, surfaceTime, surfaceSpeed,
   finalSpeed and rate = POPULATION / totalTime.
 
---- exactSolution(dropHeight, launchSpeed, interior): THE CHECK ---
-  Surface speed, from energy conservation:
-      vs^2 = v0^2 + 2GM(1/R - 1/r0)
-
-  t1 (outside), the given formula:
-      t1 = sqrt(r0^3 / 2GM) * [ sqrt(x(1-x)) + acos(sqrt x) ],  x = R/r0
-  This formula only works for a drop FROM REST. To handle the
-  launch-speed slider, the code pretends the probe was dropped from rest
-  at a higher point rA, high enough that it would already be going at v0
-  when it passes r0 (from energy: 1/rA = 1/r0 - v0^2/2GM). Then
-      t1 = (time from rA down to R) - (time from rA down to r0).
-  With v0 = 0, rA = r0 and this is exactly the textbook formula. If v0 is
-  above escape speed there is no such rA, so t1 shows as "—".
-
-  t2 (inside):
-    uniform:    inside, g is proportional to r, so the motion is simple
-                harmonic, like a mass on a spring, with w = sqrt(g0/R).
-                It reaches the centre when tan(w*t) = w*R/vs, so
-                t2 = atan(w*R/vs) / w.
-    dense core: constant g, so use the SUVAT equation R = vs*t + 1/2*g0*t^2
-                and solve the quadratic:
-                t2 = (-vs + sqrt(vs^2 + 2*g0*R)) / g0.
-
-  The exact formulas ignore drag, so with drag on the "diff." column
-  shows how much difference drag makes.
+--- firstSteps(options, n) ---
+  Gives the first 3 steps for the table in the Method section. It runs the
+  real simulate() and saves every single step, so the table shows the same
+  numbers the answer comes from. The a used in step k is the one worked
+  out at the end of step k-1, which is why it reads s[k - 1].a.
 
 --- rateVsHeight(...) ---
-  Runs the whole simulation 41 times (0, 250, 500 ... 10 000 km) to draw
-  the rate vs height graph. It uses dt = 0.05 s instead of 0.01 s because
-  that's 41 full runs; the answer changes by far less than 0.1 %.
+  Runs the whole simulation 41 times (0, 250, 500 ... 10 000 km) for the
+  rate vs height graph. It uses dt = 0.05 s because that's 41 full runs,
+  and the answer only changes by less than 0.1 %.
 
 --- thin(list, max) ---
-  A fall can have thousands of samples. Graphs only need about 600 points,
-  so this keeps every k-th one (and always the last one).
+  A fall can have thousands of samples, but a graph only needs about 600
+  points. This keeps every k-th one, plus the last one.
 
 
 3. ROUNDING (src/lib/format.ts)
 -------------------------------
-  sf3(x): x.toPrecision(3) gives "1.36e+3"; this turns it into
-          "1.36 × 10³". Every number shown on the page goes through it.
+  sf3(x): x.toPrecision(3) gives "1.36e+3", and this turns it into
+          "1.36 × 10³". Every number on the page goes through it.
   tick(x): short axis labels like 12k or 5M.
 
 
 4. THE PAGE (src/components/Lab.tsx)
 ------------------------------------
-  State: four useState values, one for each control (heightKm,
-  launchSpeed, interior, drag).
+  State: four useState values, one per control (heightKm, launchSpeed,
+  interior, drag).
 
-  useDeferredValue: dragging a slider changes the value many times a
-  second, and each change re-runs several simulations. Deferring lets the
-  slider keep moving smoothly while the maths catches up; "working it
-  out…" shows while it's behind.
+  useDeferredValue: dragging a slider changes the value a lot of times a
+  second, and every change re-runs several simulations. Deferring lets the
+  slider keep moving smoothly while the maths catches up. "working it
+  out…" shows up while it's behind.
 
-  useMemo: each calculation only re-runs when its own inputs change:
+  useMemo: each calculation only re-runs when its own inputs change.
     sim         the main Euler run (dt = 0.01 s)
-    exact       the formulas
-    plotData    sim samples thinned for the graphs
-    comparison  four extra runs: uniform/dense core × drag off/on
+    runs        the same drop with dt = 1 s and 0.1 s, for the results table
+    steps       the first 3 Euler steps, for the Method section
+    plotData    sim samples thinned out for the graphs
+    comparison  four more runs: uniform/dense core, drag off/on
     gSeries     g at 301 distances, for both interior models
     rateData    the 41-height sweep
 
-  Then it renders the lab write-up, top to bottom:
-    title block -> Aim (answer + red tick if Euler matches exact to
-    3 s.f.) -> Set-up (cross-section + controls) -> Results table ->
-    Graphs -> Does the model of Vulcan matter? -> Working.
+  The page goes top to bottom like a lab write-up:
+    title block, Aim (the answer, with a red tick if dt = 0.1 s gives the
+    same answer), Set-up (cross-section and controls), Method (how Euler's
+    method works plus the first 3 steps), Results (table for each dt),
+    Graphs, Uniform vs dense core, Working.
 
-  The handwritten notes under some graphs (velocityNote, accelNote) are
-  only shown when they are true for the current settings. With drag on
-  they're hidden, because what drag does depends on your airDensity choice.
+  The handwritten notes under some graphs (velocityNote, accelNote) only
+  show up when they're true for the current settings. With drag on they're
+  hidden, because what drag does depends on what you pick for airDensity.
 
 
 5. THE ANIMATION (src/components/CrossSection.tsx)
 --------------------------------------------------
-  simTime = how far into the fall we are (seconds of simulated time).
+  simTime is how far into the fall we are, in seconds of simulated time.
 
-  Playing: requestAnimationFrame calls a function about 60 times a second.
-  Each call measures how much real time passed and adds
-      real seconds × playback speed (e.g. 100×)
-  to simTime. It stops at the end time.
+  While it's playing, requestAnimationFrame calls a function about 60
+  times a second. Each time it checks how much real time went by and adds
+      real seconds × playback speed (like 100×)
+  to simTime, and it stops at the end.
 
-  sampleAt(samples, t) finds the two saved samples either side of t
-  (binary search) and blends between them (linear interpolation), so the
-  probe moves smoothly even though samples are 1 s apart.
+  sampleAt(samples, t) finds the two saved samples on either side of t
+  (binary search) and blends between them (linear interpolation). The
+  samples are 1 s apart, but this way the probe still moves smoothly.
 
-  Drawing: one scale factor turns metres into SVG pixels, chosen so the
-  release point and the bottom of the planet both fit. yOf(r) converts a
-  distance from the centre into a y position. The depth ruler on the
-  right uses the SAME scale, so the probe and its arrow on the ruler are
-  always level. Ruler tick spacing (500, 1000, 2000 ... km) is picked so
-  there are at most about 8 labels.
+  Drawing: one scale factor turns metres into SVG pixels, picked so the
+  release point and the bottom of the planet both fit. yOf(r) turns a
+  distance from the centre into a y position. The depth ruler on the right
+  uses the same scale, so the probe and its arrow on the ruler always line
+  up. The ruler spacing (500, 1000, 2000 ... km) is picked so there are
+  about 8 labels at most.
 
-  The scrubber slider sets simTime directly (and pauses). When any input
-  changes, the animation resets to t = 0.
+  The scrubber slider sets simTime directly and pauses. Changing any input
+  resets the animation to t = 0.
 
 
 6. THE GRAPHS (src/components/Charts.tsx)
 -----------------------------------------
-  One <Chart> component is reused for all eight graphs. It wraps Recharts:
-    LineChart + XAxis/YAxis   labelled axes with units
-    Line (one per series)     each series has its OWN data array, so lines
-                              with different end times share one x-axis
+  All eight graphs use the same <Chart> component, which wraps Recharts:
+    LineChart + XAxis/YAxis   axes with labels and units
+    Line (one per series)     each series has its own data array, so lines
+                              that end at different times share one x-axis
     ReferenceLine (marker)    red "surface" line at the crossing time
-    ReferenceArea (rock)      pencil hatching for "inside the rock"
+    ReferenceArea (rock)      pencil shading for "inside the rock"
     ReferenceDot (dot)        red circle for "this drop" on the rate graph
-    Tooltip                   hover values, rounded to 3 s.f.
+    Tooltip                   values when you hover, rounded to 3 s.f.
 
-  The look: the title is handwritten above a white "printout" with tape
-  on it (CSS .taped), axes use plain printer type, and annotations use
-  the handwriting font in red pen, as if added after printing. tilt
-  rotates each printout by under a degree so they don't look machine-made.
+  Each graph looks like a printout taped into the notebook: handwritten
+  title, white paper with tape (CSS .taped), printer-style axes, and notes
+  in red pen. tilt rotates each one by less than a degree so they don't
+  all sit perfectly straight.
 
 
 7. LOOK AND FEEL (globals.css, theme.ts, fonts.ts)
 --------------------------------------------------
-  The page is styled as a student's lab notebook:
-    - engineering-paper background: two sets of CSS gradient lines, 20 px
-      squares with a darker line every 100 px;
-    - Kalam handwriting font (bundled at build time by next/font, so it
-      works on a static site);
-    - blue ballpoint for the uniform model, green pen for the dense core,
-      red pen only for the probe and the surface line;
-    - yellow highlighter on the answers;
-    - buttons drawn as wobbly hand-drawn boxes (uneven border-radius).
-  theme.ts repeats the colours as plain hex codes because SVG attributes
-  in the graphs can't read CSS variables.
+  The page is supposed to look like a lab notebook:
+    - green engineering paper, made from two sets of CSS gradient lines
+      (20 px squares with a darker line every 100 px)
+    - Kalam handwriting font, bundled at build time by next/font so it
+      works on a static site
+    - blue pen for the uniform model, green for the dense core, and red
+      only for the probe and the surface line
+    - yellow highlighter on the answers
+    - buttons drawn as wobbly boxes (uneven border-radius)
+  theme.ts has the same colours as plain hex codes, because SVG
+  attributes in the graphs can't read CSS variables.
 
 
 8. BUILDING AND DEPLOYING
 -------------------------
   next.config.ts: output: "export" makes `npm run build` produce a plain
-  folder of HTML/JS/CSS in ./out, with no server needed. basePath
-  is needed on GitHub Pages because the site lives at
-  username.github.io/REPO-NAME/; the workflow sets it, while Vercel
-  leaves it empty.
+  folder of HTML/JS/CSS in ./out, so no server is needed. GitHub Pages
+  puts the site at username.github.io/REPO-NAME/, so it needs a basePath.
+  The workflow sets it, and on Vercel it stays empty.
 
   deploy.yml: on every push to main, GitHub installs the packages, runs
-  `npm run verify` (stops if the answers are wrong), builds, and
+  `npm run verify` (and stops if the answers are wrong), builds, and
   publishes ./out to GitHub Pages.
 
   Commands:
-    npm run dev      live-reloading site at http://localhost:3000
-    npm run verify   prints PASS/FAIL for 1.36e3 s and 5.15e6 Vulcans/s
-    npm run build    makes the static site in ./out
+    npm run dev      site at http://localhost:3000 that reloads on save
+    npm run verify   PASS/FAIL for 1.36e3 s, 5.15e6 Vulcans/s and dt = 0.1 s
+    npm run build    builds the static site into ./out
 
 
-9. THE INTERACTIONS (and where the ideas came from)
----------------------------------------------------
-  Drag-to-change numbers (Scrub.tsx). The drop height and launch speed in
-    the Aim sentence are "scrubbable": press and drag sideways. Each pixel
-    is one step (50 km or 50 m/s). Pointer capture keeps the drag going
-    even if the mouse leaves the number. Arrow keys work when it's focused
-    (Shift = 10 steps). Idea from Bret Victor's Tangle "reactive documents"
-    and Red Blob Games.
+9. THE INTERACTIONS
+-------------------
+  Dragging numbers (Scrub.tsx). You can drag the drop height and launch
+    speed in the Aim sentence sideways. Each pixel is one step (50 km or
+    50 m/s). Pointer capture keeps the drag going even if the mouse leaves
+    the number. Arrow keys work when it's selected (Shift = 10 steps). I
+    got the idea from Bret Victor's Tangle and from Red Blob Games.
 
-  Click-to-toggle words (WordToggle in Lab.tsx). "the same density all
-    the way through" / "ignoring air" flip the interior model and drag.
-    They're <span role="button"> rather than <button> because Chrome
-    won't let a button wrap across two lines.
+  Clicking words (WordToggle in Lab.tsx). Clicking "the same density all
+    the way through" or "we ignore air" switches the interior model or
+    drag. They're <span role="button"> instead of <button> because Chrome
+    won't let a button wrap onto two lines.
 
-  Guess first (Lab.tsx, markGuess). Type a guess in seconds and it gets
-    marked in red pen: within 5 % is a tick, otherwise "x % too long/
-    short". Making a prediction before seeing the answer helps you
-    remember it (the NYT "You Draw It" idea).
+  Guess first (markGuess in Lab.tsx). You type a guess in seconds and it
+    gets marked in red pen: within 5 % gets a tick, otherwise it says how
+    far off you were. Guessing before you see the answer helps you
+    remember it (from the NYT "You Draw It" articles).
 
-  Linked graphs (timeline.ts + Charts.tsx + CrossSection.tsx).
-    timeline.ts holds three numbers: time (where the animation is),
-    hover (the time under your pointer on a graph) and end. It is NOT
-    React state on purpose: it changes 60 times a second while the probe
-    falls, and putting it in Lab would redraw all eight graphs every
-    frame. Instead, only the parts that care subscribe to it:
-      - CrossSection draws the probe at `time` and a dashed pencil
-        "ghost" probe at `hover`; the readout follows your pointer.
-      - Each time graph has an overlay of three absolutely positioned
-        divs (a red "now" line, a dashed hover line, and a white "cover"
-        that fades the part of the graph the probe hasn't reached yet, so
-        the graph traces itself as it falls). They're moved with
-        transform: translateX(...%). That's cheap for the browser and never
-        re-renders Recharts.
-      - The g-vs-r graph uses followX to turn the time into the probe's
-        distance from the centre, so a red line slides along r as it falls.
-    The overlay has to line up with Recharts' plot area, so Charts.tsx
-    keeps the plot insets in one PLOT constant (chart margins + axis
-    sizes). If you change the margins, change PLOT too.
+  Linked graphs (timeline.ts, Charts.tsx, CrossSection.tsx).
+    timeline.ts holds three numbers: time (where the animation is), hover
+    (the time under your mouse on a graph) and end. It's not React state
+    on purpose. It changes 60 times a second while the probe falls, and if
+    it were state in Lab, all eight graphs would redraw every frame. So
+    only the parts that need it listen to it:
+      - CrossSection draws the probe at `time`, plus a dashed pencil
+        "ghost" probe at `hover`. The readout follows your mouse.
+      - Each time graph has three divs on top of it: a red "now" line, a
+        dashed hover line, and a white cover that hides the part the probe
+        hasn't reached yet, so the graph draws itself as it falls. They
+        move with transform: translateX(...%), which is cheap and never
+        makes Recharts redraw.
+      - The g vs r graph uses followX to turn the time into the probe's
+        distance from the centre, so a red line slides along r.
+    The divs have to line up with Recharts' plot area, so Charts.tsx keeps
+    the plot edges in one PLOT constant. If you change the chart margins,
+    change PLOT too.
 
-  Pencil ghost of the previous run (Lab.tsx). After you change a
-    setting, the velocity graph keeps your previous run as a dashed
-    pencil line. useSettled waits until you've stopped dragging for
-    350 ms, so the ghost is the last setting you actually stopped on,
-    not one from a split second ago.
+  Ghost of the last run (Lab.tsx). After you change a setting, the
+    velocity graph keeps your last run as a dashed pencil line. useSettled
+    waits until you've stopped dragging for 350 ms, so the ghost is the
+    last setting you actually stopped on.
 
-  Keyboard (CrossSection.tsx). Space = drop / pause, left/right arrows
-    = step 1 % through the fall (Shift = 10 %), R = reset. Ignored while
-    you're typing or using a control.
+  Keyboard (CrossSection.tsx). Space drops or pauses, left/right arrows
+    move 1 % through the fall (Shift = 10 %), R resets. These are ignored
+    while you're typing or using a control.
 
-  Motion. Only one thing really animates: the yellow highlighter swipes
-    across the answer, left to right, when it settles on a new value
-    (the <p> is re-keyed so the CSS animation re-runs). Everything else is
-    a 120 ms colour or opacity change. With "reduce motion" switched on
-    in your system settings, the swipe is turned off.
+  Animation. The only real animation is the yellow highlighter swiping
+    across the answer when it changes (the <p> gets a new key so the CSS
+    animation plays again). Everything else is a 120 ms colour or opacity
+    change. If "reduce motion" is on in your system settings, the swipe
+    is turned off.
 
 
 10. COMMON CHANGES
@@ -309,6 +297,7 @@ position update is r -= v*dt rather than r += v*dt.
   Change a given value (radius, g0, population) .. top of physics.ts
   Change the probe size .......................... PROBE_RADIUS, physics.ts
   Change the time step ........................... DT, physics.ts
+  Change the dt values in the results table ...... STEP_SIZES, Lab.tsx
   Change slider ranges ........................... the <input type="range">
                                                    lines in Lab.tsx
   Change colours ................................. :root in globals.css AND

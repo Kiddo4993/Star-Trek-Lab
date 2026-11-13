@@ -7,7 +7,7 @@ import {
   G0,
   POPULATION,
   R,
-  exactSolution,
+  firstSteps,
   gravity,
   rateVsHeight,
   simulate,
@@ -21,9 +21,8 @@ import { Scrub } from "./Scrub";
 import Mark from "./Mark";
 import { Chart, type Series } from "./Charts";
 
-/** Percent difference between Euler and exact, or "—" if no exact value. */
-const pctDiff = (euler: number | null, exact: number | null) =>
-  euler === null || exact === null || exact === 0 ? "—" : `${sf3((100 * (euler - exact)) / exact)} %`;
+/** The time steps compared in the results table, biggest first. */
+const STEP_SIZES = [1, 0.1, DT];
 
 const MODEL_NAME: Record<Interior, string> = { uniform: "uniform", "dense-core": "dense core" };
 
@@ -91,9 +90,14 @@ export default function Lab() {
     () => simulate({ dropHeight, launchSpeed: params.launchSpeed, interior: params.interior, drag: params.drag }),
     [dropHeight, params.launchSpeed, params.interior, params.drag]
   );
-  const exact = useMemo(
-    () => exactSolution(dropHeight, params.launchSpeed, params.interior),
-    [dropHeight, params.launchSpeed, params.interior]
+  // Same run with bigger steps, to see if the answer changes.
+  const runs = useMemo(() => {
+    const opts = { dropHeight, launchSpeed: params.launchSpeed, interior: params.interior, drag: params.drag };
+    return STEP_SIZES.map((dt) => (dt === DT ? sim : simulate({ ...opts, dt, recordEvery: 0 })));
+  }, [sim, dropHeight, params.launchSpeed, params.interior, params.drag]);
+  const steps = useMemo(
+    () => firstSteps({ dropHeight, launchSpeed: params.launchSpeed, interior: params.interior, drag: params.drag }),
+    [dropHeight, params.launchSpeed, params.interior, params.drag]
   );
   const plotData = useMemo(
     () => thin(sim.samples).map((s) => ({ t: s.t, v: s.v, a: s.a, xKm: s.x / 1000 })),
@@ -180,8 +184,9 @@ export default function Lab() {
     params.interior !== interior || params.drag !== drag;
   const isTextbook = heightKm === DEFAULT_DROP_HEIGHT / 1000 && launchSpeed === 0 && interior === "uniform" && !drag;
 
-  // Red-pen tick when Euler agrees with the exact answer to 3 s.f.
-  const checked = !params.drag && exact.total !== null && sf3(exact.total) === sf3(sim.totalTime);
+  // Red-pen tick when 10x bigger steps give the same answer to 3 s.f.
+  const coarse = runs[STEP_SIZES.length - 2];
+  const checked = coarse.reachedCentre && sf3(coarse.totalTime) === sf3(sim.totalTime);
 
   // Handwritten notes only where they're true for the current settings.
   const velocityNote = params.drag
@@ -256,7 +261,7 @@ export default function Lab() {
           <span className="hl">t = {sf3(sim.totalTime)} s</span>
           <span className="so">so</span>
           <span className="hl hl-2">{sf3(sim.rate)} Vulcans/s</span>
-          {checked && <span className="redpen" title="Euler and the formula agree to 3 s.f.">✓ same as the formula</span>}
+          {checked && <span className="redpen" title="dt = 0.1 s gives the same answer to 3 s.f.">✓ same with dt = 0.1 s</span>}
         </p>
       </section>
 
@@ -305,33 +310,102 @@ export default function Lab() {
         </div>
       </section>
 
+      <section className="entry method">
+        <h2>Method: Euler&apos;s method</h2>
+        <p>
+          I couldn&apos;t just use the kinematics equations because they need a to be constant, and here it
+          isn&apos;t. g goes up as the probe gets closer to Vulcan, and then once it&apos;s in the hole it
+          goes down (or stays the same if it&apos;s the dense core model).
+        </p>
+        <p>
+          So I used Euler&apos;s method. You split the fall into really small time steps (dt = {DT} s) and
+          pretend a is constant during each one, since it barely changes in 0.01 s. Each step:
+        </p>
+        <ol className="euler-steps">
+          <li>work out a using the probe&apos;s r right now{params.drag ? " (and take away drag)" : ""}</li>
+          <li>v<sub>new</sub> = v + a·dt</li>
+          <li>r<sub>new</sub> = r − v<sub>new</sub>·dt (it&apos;s minus since I made toward the centre positive)</li>
+        </ol>
+        <p>
+          Then you use the new v and r for the next step and keep going until r hits 0. The time is the
+          number of steps × dt.
+        </p>
+        {steps.length > 0 && (
+          <>
+            <p>First {steps.length} steps with the settings above:</p>
+            <div className="table-wrap">
+              <table className="ruled">
+                <thead>
+                  <tr><th scope="col">step</th><th scope="col">t (s)</th><th scope="col">a used (m/s²)</th><th scope="col">new v (m/s)</th><th scope="col">fallen so far (m)</th></tr>
+                </thead>
+                <tbody>
+                  {steps.map((s) => (
+                    <tr key={s.step}>
+                      <th scope="row">{s.step}</th>
+                      <td>{s.t.toFixed(2)}</td>
+                      <td>{sf3(s.a)}</td>
+                      <td>{sf3(s.v)}</td>
+                      <td>{sf3(s.x)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="aside">
+              Step 1 worked out: v = {params.launchSpeed === 0 ? "0" : sf3(params.launchSpeed)} + {sf3(steps[0].a)} × {DT} = {sf3(steps[0].v)} m/s,
+              and it moves {sf3(steps[0].v)} × {DT} = {sf3(steps[0].x)} m. It takes{" "}
+              {Math.round(sim.totalTime / DT).toLocaleString("en-US")} steps to reach the centre, so I wrote code to do it.
+            </p>
+          </>
+        )}
+        <p>
+          a still changes a little inside each step, so the answer is a bit off. A smaller dt makes it less
+          off. To check, I also ran it with dt = 1 s and 0.1 s (in the table below). If the answer stays the
+          same when dt gets smaller, then dt is small enough.
+        </p>
+      </section>
+
       <section className="entry">
         <h2>Results</h2>
         <div className="table-wrap">
           <table className="ruled">
             <thead>
-              <tr><th scope="col"></th><th scope="col">Euler</th><th scope="col">Exact{params.drag ? "*" : ""}</th><th scope="col">diff.</th></tr>
+              <tr>
+                <th scope="col"></th>
+                {STEP_SIZES.map((dt) => <th scope="col" key={dt}>dt = {dt} s</th>)}
+              </tr>
             </thead>
             <tbody>
-              <tr><th scope="row">time to surface, t₁</th><td>{sf3(sim.surfaceTime)} s</td><td>{sf3(exact.t1)} s</td><td>{pctDiff(sim.surfaceTime, exact.t1)}</td></tr>
-              <tr>
-                <th scope="row">surface to centre, t₂</th>
-                <td>{sim.surfaceTime === null ? "—" : `${sf3(sim.totalTime - sim.surfaceTime)} s`}</td>
-                <td>{sf3(exact.t2)} s</td>
-                <td>{sim.surfaceTime === null ? "—" : pctDiff(sim.totalTime - sim.surfaceTime, exact.t2)}</td>
-              </tr>
-              <tr className="key"><th scope="row">total time</th><td><span className="hl">{sf3(sim.totalTime)} s</span></td><td>{sf3(exact.total)} s</td><td>{pctDiff(sim.totalTime, exact.total)}</td></tr>
-              <tr><th scope="row">speed at surface</th><td>{sf3(sim.surfaceSpeed)} m/s</td><td>{sf3(exact.surfaceSpeed)} m/s</td><td>{pctDiff(sim.surfaceSpeed, exact.surfaceSpeed)}</td></tr>
-              <tr><th scope="row">speed at centre</th><td>{sf3(sim.finalSpeed)} m/s</td><td>—</td><td>—</td></tr>
-              <tr className="key"><th scope="row">rate (Vulcans/s)</th><td><span className="hl">{sf3(sim.rate)}</span></td><td>{sf3(exact.rate)}</td><td>{pctDiff(sim.rate, exact.rate)}</td></tr>
+              {(
+                [
+                  ["time to surface, t₁", (r) => `${sf3(r.surfaceTime)} s`],
+                  ["surface to centre, t₂", (r) => (r.surfaceTime === null ? "—" : `${sf3(r.totalTime - r.surfaceTime)} s`)],
+                  ["total time", (r) => `${sf3(r.totalTime)} s`, true],
+                  ["speed at surface", (r) => `${sf3(r.surfaceSpeed)} m/s`],
+                  ["speed at centre", (r) => `${sf3(r.finalSpeed)} m/s`],
+                  ["rate (Vulcans/s)", (r) => sf3(r.rate), true],
+                  ["steps", (r, dt) => Math.round(r.totalTime / dt).toLocaleString("en-US")],
+                ] as [string, (r: typeof sim, dt: number) => string, boolean?][]
+              ).map(([label, cell, key]) => (
+                <tr key={label} className={key ? "key" : undefined}>
+                  <th scope="row">{label}</th>
+                  {runs.map((r, i) => {
+                    const text = r.reachedCentre ? cell(r, STEP_SIZES[i]) : "—";
+                    return <td key={i}>{key && r === sim ? <span className="hl">{text}</span> : text}</td>;
+                  })}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
         <ul className="footnotes">
-          {params.drag && <li>* the formulas don&apos;t include drag, so this column is basically how much drag changes things</li>}
+          <li>
+            {checked
+              ? "dt = 0.1 s and 0.01 s give the same answer, so 0.01 s is small enough."
+              : "dt = 0.1 s and 0.01 s don't match here, so dt probably needs to be smaller."}
+          </li>
           {!sim.reachedCentre && <li>the sim hit its time limit before getting to the centre</li>}
-          {exact.t1 === null && <li>the launch speed is above escape speed, so the t₁ formula doesn&apos;t work here</li>}
-          <li>dt = {DT} s, all answers to 3 s.f.</li>
+          <li>all answers to 3 s.f.</li>
         </ul>
       </section>
 
@@ -415,9 +489,8 @@ export default function Lab() {
         <dl>
           <dt>gravity outside</dt><dd>g = GM/r², with GM = g₀R² = {sf3(G0 * R * R)} m³/s²</dd>
           <dt>gravity inside</dt><dd>uniform: g = g₀r/R; dense core: g = g₀</dd>
-          <dt>Euler step</dt><dd>a = a(r), then v += a·dt, then r −= v·dt. Repeat until r = 0.</dd>
-          <dt>exact, outside</dt><dd>t₁ = √(r₀³/2GM)·[√(x(1−x)) + cos⁻¹√x], x = R/r₀</dd>
-          <dt>exact, inside</dt><dd>uniform: t₂ = tan⁻¹(ωR/v<sub>s</sub>)/ω, ω = √(g₀/R)<br />dense core: t₂ = (−v<sub>s</sub> + √(v<sub>s</sub>² + 2g₀R))/g₀</dd>
+          <dt>Euler step</dt><dd>a from r, then v = v + a·dt, then r = r − v·dt. Repeat until r = 0.</dd>
+          <dt>total time</dt><dd>(number of steps) × dt</dd>
           <dt>rate</dt><dd>population ÷ total fall time</dd>
         </dl>
         <p className="foot">All the physics code is in <code>src/lib/physics.ts</code>.</p>

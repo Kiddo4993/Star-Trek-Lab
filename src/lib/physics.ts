@@ -1,8 +1,8 @@
 /**
- * Physics for the red-matter probe falling through a hole drilled to the
- * centre of Vulcan.
+ * Physics for the red-matter probe falling down a hole to the centre of
+ * Vulcan.
  *
- * Sign convention used everywhere in this file:
+ * Signs (same in the whole file):
  *   r  = distance from Vulcan's centre (m)
  *   v  = speed TOWARD the centre (m/s)  -> positive while falling in
  *   a  = acceleration TOWARD the centre (m/s²)
@@ -144,16 +144,16 @@ export interface SimResult {
 }
 
 /**
- * Step the motion with Euler's method exactly as specified:
- *   1. a  = a(r, v)          (acceleration from the current position)
- *   2. v += a·dt             (update velocity)
- *   3. r -= v·dt             (update position with the NEW velocity;
- *                             minus because v is toward the centre)
- * Repeat until r ≤ 0.
+ * Euler's method. The acceleration keeps changing, so the fall is cut into
+ * tiny steps of dt seconds and a is treated as constant during each one:
+ *   1. a = acceleration at the current r (and v, for drag)
+ *   2. v = v + a*dt
+ *   3. r = r - v*dt   (minus because v points toward the centre)
+ * The new v and r are the start of the next step. Stop when r reaches 0.
  *
- * Using the updated v in step 3 makes this the semi-implicit
- * (Euler–Cromer) variant, which is far more stable than plain Euler
- * for the spring-like motion inside the planet.
+ * Step 3 uses the new v, not the old one. That small change (called
+ * Euler-Cromer) keeps it accurate inside the planet, where the probe
+ * moves like a mass on a spring and plain Euler slowly gains energy.
  */
 export function simulate(opts: SimOptions): SimResult {
   const dt = opts.dt ?? DT;
@@ -212,95 +212,13 @@ export function simulate(opts: SimOptions): SimResult {
 }
 
 // ---------------------------------------------------------------------------
-// Exact (analytic) solution, no drag
-// ---------------------------------------------------------------------------
-
-/**
- * Time to fall from rest at radius rA down to radius r (r ≤ rA) under
- * g = GM/r². This is the given formula with x = r/rA:
- *   t = sqrt(rA³ / 2GM) · [ sqrt(x(1−x)) + acos(sqrt x) ]
- */
-function fallTimeFromRest(rA: number, r: number): number {
-  const x = Math.min(1, Math.max(0, r / rA)); // clamp round-off
-  return Math.sqrt((rA * rA * rA) / (2 * GM)) * (Math.sqrt(x * (1 - x)) + Math.acos(Math.sqrt(x)));
-}
-
-export interface ExactResult {
-  t1: number | null; // s, release → surface (null if no closed form)
-  t2: number; // s, surface → centre
-  total: number | null;
-  surfaceSpeed: number; // m/s
-  rate: number | null; // Vulcans/s
-}
-
-/**
- * Closed-form answer for the drag-free case.
- *
- * Outside (t1): with launch speed v0 > 0 the probe moves as if it had been
- * dropped from rest at a higher "apex" radius rA, where energy conservation
- * gives 1/rA = 1/r0 − v0²/(2GM). Then t1 = T(rA→R) − T(rA→r0).
- * With v0 = 0, rA = r0, x = R/r0 and this is exactly the given formula.
- * If v0 ≥ escape speed, there is no apex (hyperbolic orbit) → t1 = null.
- *
- * Surface speed from energy conservation:
- *   vs² = v0² + 2GM(1/R − 1/r0)
- *
- * Inside (t2):
- *   uniform: SHM with ω = sqrt(g0/R); r(t) = R·cos ωt − (vs/ω)·sin ωt
- *            hits 0 when tan ωt = ωR/vs  →  t2 = atan(ωR/vs)/ω
- *   dense core: constant g0, R = vs·t + ½g0·t²
- *            →  t2 = (−vs + sqrt(vs² + 2g0R)) / g0
- */
-export function exactSolution(
-  dropHeight: number,
-  launchSpeed: number,
-  interior: Interior
-): ExactResult {
-  const r0 = R + dropHeight;
-  const v0 = launchSpeed;
-
-  const surfaceSpeed = Math.sqrt(v0 * v0 + 2 * GM * (1 / R - 1 / r0));
-
-  let t1: number | null;
-  if (dropHeight <= 0) {
-    t1 = 0;
-  } else {
-    const invApex = 1 / r0 - (v0 * v0) / (2 * GM);
-    if (invApex <= 0) {
-      t1 = null;
-    } else {
-      const rA = v0 === 0 ? r0 : 1 / invApex;
-      t1 = fallTimeFromRest(rA, R) - fallTimeFromRest(rA, r0);
-    }
-  }
-
-  let t2: number;
-  if (interior === "uniform") {
-    const omega = Math.sqrt(G0 / R);
-    // atan(∞) = π/2 handles vs = 0 (quarter period) automatically
-    t2 = Math.atan((omega * R) / surfaceSpeed) / omega;
-  } else {
-    t2 = (-surfaceSpeed + Math.sqrt(surfaceSpeed * surfaceSpeed + 2 * G0 * R)) / G0;
-  }
-
-  const total = t1 === null ? null : t1 + t2;
-  return {
-    t1,
-    t2,
-    total,
-    surfaceSpeed,
-    rate: total === null ? null : POPULATION / total,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Helpers for charts
 // ---------------------------------------------------------------------------
 
 /**
- * Rate (Vulcans/s) for each drop height in heightsKm. Uses a coarser
- * time step (0.05 s) because it runs ~40 full simulations; the result
- * differs from dt = 0.01 s by well under 0.1 %.
+ * Rate (Vulcans/s) for each drop height in heightsKm. This runs about 40
+ * whole simulations, so it uses dt = 0.05 s to be faster. That changes the
+ * answer by less than 0.1 %.
  */
 export function rateVsHeight(
   heightsKm: number[],
@@ -326,4 +244,29 @@ export function thin<T>(arr: T[], max = 600): T[] {
   if (arr.length <= max) return arr;
   const k = Math.ceil(arr.length / max);
   return arr.filter((_, i) => i % k === 0 || i === arr.length - 1);
+}
+
+/** One row of the "first few steps" table. */
+export interface EulerStep {
+  step: number;
+  t: number; // s, time at the end of the step
+  a: number; // m/s², acceleration used during the step
+  v: number; // m/s, new velocity
+  x: number; // m, total distance fallen so far
+}
+
+/**
+ * The first n Euler steps, for showing the method by hand. It runs the
+ * real simulate() and records every step, so the numbers are exactly the
+ * ones the answer is built from. The acceleration used in step k is the
+ * one worked out at the end of step k-1.
+ */
+export function firstSteps(opts: SimOptions, n = 3): EulerStep[] {
+  const dt = opts.dt ?? DT;
+  const s = simulate({ ...opts, dt, recordEvery: dt, maxTime: (n + 0.5) * dt }).samples;
+  const rows: EulerStep[] = [];
+  for (let k = 1; k <= n && k < s.length; k++) {
+    rows.push({ step: k, t: s[k].t, a: s[k - 1].a, v: s[k].v, x: s[k].x });
+  }
+  return rows;
 }
